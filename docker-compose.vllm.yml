@@ -1,0 +1,54 @@
+version: "3.8"
+
+services:
+  vllm:
+    image: vllm/vllm-openai:latest
+    container_name: inferencepack-vllm
+    restart: unless-stopped
+    runtime: nvidia
+    shm_size: '16gb'
+    ports:
+      - "8001:8000"
+    volumes:
+      - /models:/models
+      - ./scripts:/app/scripts:ro
+    environment:
+      - CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
+      - VLLM_LOGGING_LEVEL=INFO
+      - HF_HOME=/models/.cache/huggingface
+    command:
+      - --model
+      - /models/EXAONE-3.5-32B-Instruct
+      - --trust-remote-code
+      - --tensor-parallel-size
+      - "4"
+      - --gpu-memory-utilization
+      - "0.90"
+      - --max-model-len
+      - "32768"
+      - --dtype
+      - bfloat16
+      - --port
+      - "8000"
+      - --enable-prefix-caching
+      - --enable-chunked-prefill
+    networks:
+      - inferencepack
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+networks:
+  inferencepack:
+    external: true
+    name: inferencepack
