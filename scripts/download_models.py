@@ -8,8 +8,8 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional
 
 
-def ensure_huggingface_cli():
-    if subprocess.run(["huggingface-cli", "--version"], capture_output=True).returncode == 0:
+def ensure_hf_cli():
+    if subprocess.run(["hf", "--version"], capture_output=True).returncode == 0:
         return
     print("[INFO] Installing huggingface-hub via uv...")
     subprocess.check_call(["uv", "tool", "install", "huggingface-hub[cli]"])
@@ -27,19 +27,19 @@ def download_model(repo_id: str, local_dir: str, token: Optional[str] = None) ->
     local_path = Path(local_dir)
     local_path.mkdir(parents=True, exist_ok=True)
 
+    env = os.environ.copy()
+    if token:
+        env["HF_TOKEN"] = token
+
     cmd = [
-        "huggingface-cli", "download",
+        "hf", "download",
         repo_id,
         "--local-dir", local_dir,
-        "--local-dir-use-symlinks", "False",
-        "--resume-download",
     ]
-    if token:
-        cmd.extend(["--token", token])
 
     print(f"  [INFO] Downloading {repo_id} -> {local_dir}")
     try:
-        subprocess.check_call(cmd)
+        subprocess.check_call(cmd, env=env)
         print(f"  [SUCCESS] Download complete: {repo_id}")
         return True
     except subprocess.CalledProcessError as e:
@@ -66,7 +66,7 @@ def main():
     parser.add_argument("--check-only", action="store_true", help="Only check, do not download")
     args = parser.parse_args()
 
-    ensure_huggingface_cli()
+    ensure_hf_cli()
 
     config_path = Path(args.config)
     if not config_path.is_absolute():
