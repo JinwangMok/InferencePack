@@ -63,6 +63,7 @@ services:
       - DEFAULT_MODELS=EXAONE-3.5-32B-Instruct
       - ENABLE_SIGNUP=true
       - WEBUI_AUTH=false
+      - ENABLE_OLLAMA_API=false
       - HF_HOME=/models/.cache/huggingface
     volumes:
       - openwebui_data:/app/backend/data
