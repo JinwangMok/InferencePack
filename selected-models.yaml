@@ -4,89 +4,21 @@ models:
     local_path: "/models/EXAONE-3.5-32B-Instruct"
     description: "LGAI EXAONE 3.5 32B Instruct (Korean-English bilingual)"
     recommended_engine: "vllm"
-    engines:
-      vllm:
-        supported: true
-        tensor_parallel_size: 4
-        gpu_memory_utilization: 0.90
-        dtype: "bfloat16"
-        max_model_len: 32768
-        trust_remote_code: true
-      sglang:
-        supported: true
-        tp_size: 4
-        mem_fraction_static: 0.90
-        dtype: "bfloat16"
-        trust_remote_code: true
-      tensorrt_llm:
-        supported: false
-        note: "EXAONE architecture not yet supported in TensorRT-LLM"
 
   - name: "Qwen2.5-72B-Instruct"
     huggingface_repo: "Qwen/Qwen2.5-72B-Instruct"
     local_path: "/models/Qwen2.5-72B-Instruct"
     description: "Alibaba Qwen2.5 72B Instruct"
     recommended_engine: "vllm"
-    engines:
-      vllm:
-        supported: true
-        tensor_parallel_size: 8
-        gpu_memory_utilization: 0.92
-        dtype: "bfloat16"
-        max_model_len: 32768
-      sglang:
-        supported: true
-        tp_size: 8
-        mem_fraction_static: 0.92
-        dtype: "bfloat16"
-      tensorrt_llm:
-        supported: true
-        tensor_parallel: 8
-        pipeline_parallel: 1
-        dtype: "bfloat16"
-        note: "Requires engine build step"
 
   - name: "Llama-3.1-70B-Instruct"
     huggingface_repo: "meta-llama/Meta-Llama-3.1-70B-Instruct"
     local_path: "/models/Meta-Llama-3.1-70B-Instruct"
     description: "Meta Llama 3.1 70B Instruct"
     recommended_engine: "vllm"
-    engines:
-      vllm:
-        supported: true
-        tensor_parallel_size: 8
-        gpu_memory_utilization: 0.90
-        dtype: "bfloat16"
-        max_model_len: 131072
-      sglang:
-        supported: true
-        tp_size: 8
-        mem_fraction_static: 0.90
-        dtype: "bfloat16"
-      tensorrt_llm:
-        supported: true
-        tensor_parallel: 8
-        pipeline_parallel: 1
-        dtype: "bfloat16"
-        note: "Requires engine build step"
 
   - name: "DeepSeek-R1-Distill-Qwen-32B"
     huggingface_repo: "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B"
     local_path: "/models/DeepSeek-R1-Distill-Qwen-32B"
     description: "DeepSeek R1 Distill Qwen 32B"
     recommended_engine: "vllm"
-    engines:
-      vllm:
-        supported: true
-        tensor_parallel_size: 4
-        gpu_memory_utilization: 0.90
-        dtype: "bfloat16"
-        max_model_len: 32768
-      sglang:
-        supported: true
-        tp_size: 4
-        mem_fraction_static: 0.90
-        dtype: "bfloat16"
-      tensorrt_llm:
-        supported: false
-        note: "DeepSeek-R1 Distill not yet supported"

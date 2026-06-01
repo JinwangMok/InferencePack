@@ -6,17 +6,21 @@ A unified, Docker-based inference stack for DGX A100 servers supporting **vLLM**
 
 - **Multi-Engine Support**: Choose between vLLM, SGLang, or TensorRT-LLM via a single command
 - **Automated Model Management**: Downloads and caches HuggingFace models with resume support
-- **LangFuse Integration**: Full LLM usage monitoring and tracing out of the box
+- **Native LangFuse Tracing**: Inference engines send OpenTelemetry traces directly to LangFuse — no proxy bottleneck
 - **Production-Ready**: Optimized defaults for A100 8x GPU configurations
-- **One-Command Deploy**: `./run.sh [vllm|sglang|tensorrtllm]` handles Docker, NVIDIA runtime, model checks, and service startup
+- **One-Command Deploy**: `./run.sh [vllm|sglang|tensorrtllm]` handles model checks and service startup
 
 ## Requirements
 
 - Ubuntu 24.04 LTS
 - NVIDIA DGX A100 (8x A100 80GB)
+- **Docker** installed and running
+- **NVIDIA Container Toolkit** configured (`docker info | grep nvidia`)
 - NVIDIA drivers installed
 - Internet access for Docker image pulls and model downloads
 - HuggingFace token (for gated models)
+
+> **Note**: `run.sh` no longer auto-installs Docker or NVIDIA Toolkit. Please ensure these are pre-installed on your bare-metal server.
 
 ## Quick Start
 
@@ -32,19 +36,39 @@ cd InferencePack
 ```
 
 The `run.sh` script will:
-1. Install Docker and NVIDIA Container Toolkit (if missing)
+1. Verify Docker and prerequisites
 2. Verify and download models specified in `selected-models.yaml`
-3. Start LangFuse + chosen inference engine + monitoring proxy
+3. Start LangFuse services
+4. Start the chosen inference engine (with native OTEL tracing to LangFuse)
 
 ## Services
 
 | Service | URL | Description |
 |---------|-----|-------------|
-| OpenAI API | `http://localhost:8000/v1` | Main inference endpoint (via monitoring proxy) |
+| OpenAI API | `http://localhost:8000/v1` | Inference endpoint (direct engine access) |
 | LangFuse UI | `http://localhost:3000` | LLM observability and tracing dashboard |
-| vLLM Direct | `http://localhost:8001` | Direct vLLM access (bypass proxy) |
-| SGLang Direct | `http://localhost:8002` | Direct SGLang access (bypass proxy) |
-| TensorRT-LLM Direct | `http://localhost:8003` | Direct TensorRT-LLM access (bypass proxy) |
+
+> **Previous versions used a monitoring-proxy on port 8000. This has been removed.**
+> Engines now expose port 8000 directly and send traces natively to LangFuse via OTLP.
+
+## Architecture
+
+```
+User Request
+     |
+     v
++----------------------------------+
+|  vLLM / SGLang / TensorRT-LLM  |  <- Port 8000, OpenAI-compatible API
+|  (native OTEL tracing)           |     sends spans to LangFuse OTLP endpoint
++----------------------------------+
+              |
+              v
++----------------------------------+
+|  LangFuse v3                     |  <- Port 3000
+|  (web + worker + postgres        |
+|   + redis + clickhouse + minio)  |
++----------------------------------+
+```
 
 ## Model Configuration
 
@@ -58,31 +82,39 @@ models:
     recommended_engine: "vllm"
 ```
 
-Models are cached at `/models/<model-name>`. The download script skips existing valid models.
+Models are downloaded to `/models/<model-name>`. Existing valid models are skipped automatically.
 
 ## LangFuse Setup
 
 1. Visit `http://localhost:3000` after startup
-2. Sign up with the pre-configured account:
+2. Sign in with the pre-configured account from your `.env` file:
    - Email: `netai@smartx.kr`
    - Password: `netai123`
 3. Create a project and generate API keys
-4. Add keys to `.env`:
+4. Add keys to `.env` if you want to use LangFuse client SDKs elsewhere:
    ```bash
    LANGFUSE_PUBLIC_KEY=pk-xxxxxxxx
    LANGFUSE_SECRET_KEY=sk-xxxxxxxx
    ```
-5. Restart the monitoring proxy:
-   ```bash
-   docker compose --profile vllm restart monitoring-proxy
-   ```
+5. **Engine traces are sent automatically** via OTLP — no restart needed.
+
+## Engine Configuration
+
+Engine parameters (tensor-parallel size, GPU memory, etc.) are defined directly in their respective compose files:
+
+| Engine | Compose File | Key Parameters |
+|--------|-------------|----------------|
+| vLLM | `docker-compose.vllm.yml` | `--tensor-parallel-size 8`, `--gpu-memory-utilization 0.92` |
+| SGLang | `docker-compose.sglang.yml` | `--tp 8`, `--mem-fraction-static 0.80` |
+| TensorRT-LLM | `docker-compose.tensorrtllm.yml` | `--tp_size 4`, `--pp_size 1` |
+
+Modify these files directly to tune for your workload.
 
 ## Benchmarking
 
 ### vLLM Throughput Benchmark
 
 ```bash
-# Using the monitoring proxy (LangFuse traces recorded)
 vllm bench throughput \
   --model /models/EXAONE-3.5-32B-Instruct \
   --api-base http://localhost:8000/v1 \
@@ -90,16 +122,9 @@ vllm bench throughput \
   --num-prompts 100 \
   --gpu-memory-utilization 0.90 \
   --tensor-parallel-size 4
-
-# Direct access (no LangFuse traces)
-vllm bench throughput \
-  --model /models/EXAONE-3.5-32B-Instruct \
-  --api-base http://localhost:8001/v1 \
-  --trust-remote-code \
-  --num-prompts 100 \
-  --gpu-memory-utilization 0.90 \
-  --tensor-parallel-size 4
 ```
+
+> The API endpoint is now direct engine access (port 8000). No proxy overhead.
 
 ## Engine-Specific Notes
 
@@ -107,45 +132,58 @@ vllm bench throughput \
 - Best official support for EXAONE architecture
 - Native `ExaoneForCausalLM` support
 - OpenAI-compatible API with prefix caching and chunked prefill enabled
+- Sends OTEL traces directly to LangFuse via `--otlp-traces-endpoint`
 
 ### SGLang
 - Experimental support for EXAONE 32B (7.8B officially tested)
 - Uses `--tp 8 --mem-fraction-static 0.80`
-- Native OpenTelemetry tracing support
+- Native OpenTelemetry tracing with `--enable-trace --otlp-traces-endpoint`
 
 ### TensorRT-LLM
 - Supports EXAONE 3.5 via AutoDeploy/PyTorch backend
 - Uses `trtllm-serve` with `--tp_size 4 --pp_size 1`
 - Engine pre-build step not required for AutoDeploy path
+- OTLP tracing via `--otlp_traces_endpoint`
 
 ## Project Structure
 
 ```
 InferencePack/
-├── docker-compose.yml          # Main compose with LangFuse + engines
-├── selected-models.yaml        # Model registry and engine configs
-├── run.sh                      # Single entrypoint script
-├── .env.example                # Environment variable template
+├── docker-compose.langfuse.yml     # LangFuse v3 stack (run once)
+├── docker-compose.vllm.yml         # vLLM inference engine
+├── docker-compose.sglang.yml       # SGLang inference engine
+├── docker-compose.tensorrtllm.yml  # TensorRT-LLM inference engine
+├── selected-models.yaml            # Model registry
+├── run.sh                          # Single entrypoint script
+├── .env.example                    # Environment variable template
 ├── scripts/
-│   └── download_models.py      # Model download/verification
-└── monitoring-proxy/
-    ├── Dockerfile              # Proxy container build
-    ├── requirements.txt        # Python dependencies
-    └── main.py                 # FastAPI proxy with LangFuse integration
+│   └── download_models.py          # Model download/verification
+└── README.md                       # This file
 ```
 
 ## Troubleshooting
 
 ### Docker not found
-`run.sh` automatically installs Docker. If it fails, run:
+Install Docker manually:
 ```bash
 curl -fsSL https://get.docker.com | sh
+sudo usermod -aG docker $USER
+newgrp docker
 ```
 
 ### NVIDIA runtime not available
-`run.sh` installs NVIDIA Container Toolkit. Verify with:
+Install NVIDIA Container Toolkit:
 ```bash
-docker info | grep nvidia
+# https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html
+curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | \
+  sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | \
+  sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
+  sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
+sudo apt-get update
+sudo apt-get install -y nvidia-container-toolkit
+sudo nvidia-ctk runtime configure --runtime=docker
+sudo systemctl restart docker
 ```
 
 ### Out of Memory

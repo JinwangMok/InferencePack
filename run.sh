@@ -10,62 +10,30 @@ log_info() { echo "[INFO] $*"; }
 log_warn() { echo "[WARN] $*"; }
 log_error() { echo "[ERROR] $*"; }
 
-install_docker() {
-    if command -v docker >/dev/null 2>&1; then
-        log_info "Docker already installed: $(docker --version)"
-        return 0
+check_prerequisites() {
+    if ! command -v docker >/dev/null 2>&1; then
+        log_error "Docker is not installed. Please install Docker first."
+        log_error "Ubuntu: curl -fsSL https://get.docker.com | sh"
+        exit 1
     fi
 
-    log_info "Installing Docker..."
-    curl -fsSL https://get.docker.com | sh
-    sudo usermod -aG docker "${USER}" || true
-    sudo systemctl enable docker
-    sudo systemctl start docker
-    log_info "Docker installed successfully"
-
-    if ! groups | grep -q docker; then
-        log_warn "You have been added to the 'docker' group."
-        log_warn "Please run 'newgrp docker' or log out and back in, then re-run this script."
-        log_warn "Alternatively, run: sudo ./run.sh ${ENGINE}"
-        exit 0
-    fi
-}
-
-install_nvidia_container_toolkit() {
-    if docker info 2>/dev/null | grep -q "nvidia"; then
-        log_info "NVIDIA Container Toolkit already configured"
-        return 0
+    if ! docker info >/dev/null 2>&1; then
+        log_error "Docker daemon is not running or you lack permissions."
+        log_error "Try: sudo systemctl start docker"
+        log_error "Or add your user to the docker group: sudo usermod -aG docker \$USER"
+        exit 1
     fi
 
-    log_info "Installing NVIDIA Container Toolkit..."
-    if ! command -v nvidia-smi >/dev/null 2>&1; then
-        log_warn "nvidia-smi not found. Please ensure NVIDIA drivers are installed."
-        log_warn "Continuing anyway..."
+    if ! docker info 2>/dev/null | grep -q "nvidia"; then
+        log_warn "NVIDIA Container Toolkit may not be configured."
+        log_warn "If GPU containers fail, install it:"
+        log_warn "  https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html"
     fi
 
-    curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
-    curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | \
-        sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
-        sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
-
-    sudo apt-get update
-    sudo apt-get install -y nvidia-container-toolkit
-    sudo nvidia-ctk runtime configure --runtime=docker
-    sudo systemctl restart docker
-    log_info "NVIDIA Container Toolkit installed"
-}
-
-install_python_deps() {
-    if python3 -c "import huggingface_hub, yaml" 2>/dev/null; then
-        log_info "Python dependencies already installed"
-        return 0
+    if ! command -v python3 >/dev/null 2>&1; then
+        log_error "python3 is required but not installed."
+        exit 1
     fi
-
-    log_info "Installing Python dependencies..."
-    sudo apt-get update
-    sudo apt-get install -y python3-pip python3-yaml
-    pip3 install --user huggingface_hub PyYAML
-    log_info "Python dependencies installed"
 }
 
 download_models() {
@@ -75,7 +43,13 @@ download_models() {
         exit 1
     fi
 
+    if ! command -v huggingface-cli >/dev/null 2>&1; then
+        log_info "Installing huggingface-hub..."
+        pip3 install --user -q huggingface-hub
+    fi
+
     sudo mkdir -p "${MODELS_DIR}"
+    sudo chmod 777 "${MODELS_DIR}" || true
 
     python3 "${SCRIPT_DIR}/scripts/download_models.py" \
         --config "${CONFIG_FILE}" \
@@ -124,23 +98,6 @@ select_engine() {
     log_info "Selected engine: ${ENGINE}"
 }
 
-setup_backend_url() {
-    case "${ENGINE}" in
-        vllm)
-            BACKEND_URL="http://vllm:8000"
-            ;;
-        sglang)
-            BACKEND_URL="http://sglang:30000"
-            ;;
-        tensorrtllm)
-            BACKEND_URL="http://tensorrtllm:8000"
-            ;;
-    esac
-
-    export BACKEND_URL
-    log_info "Backend URL set to: ${BACKEND_URL}"
-}
-
 setup_env_file() {
     local env_file="${SCRIPT_DIR}/.env"
 
@@ -153,63 +110,69 @@ setup_env_file() {
 # HuggingFace Token (required for gated models)
 HF_TOKEN=${HF_TOKEN:-}
 
-# vLLM API Key (optional, for API authentication)
+# vLLM API Key (optional - enables API authentication)
 VLLM_API_KEY=${VLLM_API_KEY:-}
 
-# LangFuse Configuration
-NEXTAUTH_SECRET=inferencepack-secret-$(openssl rand -hex 16)
-SALT=inferencepack-salt-$(openssl rand -hex 16)
-ENCRYPTION_KEY=$(openssl rand -hex 32)
-REDIS_AUTH=$(openssl rand -hex 16)
+# LangFuse Security Keys
+NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-inferencepack-secret-$(openssl rand -hex 16)}
+SALT=${SALT:-inferencepack-salt-$(openssl rand -hex 16)}
+ENCRYPTION_KEY=${ENCRYPTION_KEY:-$(openssl rand -hex 32)}
+REDIS_AUTH=${REDIS_AUTH:-$(openssl rand -hex 16)}
 
-# LangFuse Initial User (optional - set to auto-create on first run)
-LANGFUSE_INIT_USER_EMAIL=netai@smartx.kr
-LANGFUSE_INIT_USER_NAME=admin
-LANGFUSE_INIT_USER_PASSWORD=netai123
+# LangFuse Initial User (optional - auto-created on first run)
+LANGFUSE_INIT_USER_EMAIL=${LANGFUSE_INIT_USER_EMAIL:-netai@smartx.kr}
+LANGFUSE_INIT_USER_NAME=${LANGFUSE_INIT_USER_NAME:-admin}
+LANGFUSE_INIT_USER_PASSWORD=${LANGFUSE_INIT_USER_PASSWORD:-netai123}
 
-# LangFuse API Keys (generate these from LangFuse UI after first startup)
-LANGFUSE_PUBLIC_KEY=
-LANGFUSE_SECRET_KEY=
+# LangFuse API Keys (get from LangFuse UI after first startup)
+LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY:-}
+LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY:-}
 
-# OpenTelemetry Endpoint (optional - set to send traces to LangFuse)
-# OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://langfuse-web:3000/api/public/otel/v1/traces
-
-# Engine selection
-BACKEND_URL=${BACKEND_URL:-http://vllm:8000}
-ENABLE_LANGFUSE=true
+# OpenTelemetry endpoint for native engine tracing to LangFuse
+OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://langfuse-web:3000/api/public/otel/v1/traces
+OTEL_EXPORTER_OTLP_TRACES_PROTOCOL=http/protobuf
+OTEL_SERVICE_NAME=inferencepack-engine
 EOF
         log_info ".env file created at ${env_file}"
-        log_info "Please review and update HF_TOKEN and LangFuse API keys"
-    else
-        sed -i "s|^BACKEND_URL=.*|BACKEND_URL=${BACKEND_URL}|" "${env_file}" || true
+        log_info "Please review and update HF_TOKEN and LangFuse API keys if needed"
     fi
 }
 
-start_services() {
-    log_info "Starting InferencePack services with engine: ${ENGINE}"
+start_langfuse() {
+    log_info "Starting LangFuse services..."
+    cd "${SCRIPT_DIR}"
+    docker compose -f docker-compose.langfuse.yml up -d
+}
 
+start_engine() {
+    log_info "Starting ${ENGINE} inference engine..."
     cd "${SCRIPT_DIR}"
 
-    docker compose --profile "${ENGINE}" up -d
+    local compose_file="docker-compose.${ENGINE}.yml"
+    if [ ! -f "${compose_file}" ]; then
+        log_error "Compose file not found: ${compose_file}"
+        exit 1
+    fi
 
-    log_info "Services starting..."
+    docker compose -f "${compose_file}" up -d
+
     log_info ""
     log_info "=========================================="
     log_info "  InferencePack is starting up"
     log_info "=========================================="
     log_info "LangFuse UI:     http://localhost:3000"
-    log_info "API Endpoint:    http://localhost:8000"
+    log_info "API Endpoint:    http://localhost:8000/v1"
     log_info "Engine:          ${ENGINE}"
     log_info ""
-    log_info "To monitor logs: docker compose -f docker-compose.yml --profile ${ENGINE} logs -f"
-    log_info "To stop:         docker compose -f docker-compose.yml --profile ${ENGINE} down"
+    log_info "To monitor logs: docker compose -f ${compose_file} logs -f"
+    log_info "To stop:         docker compose -f ${compose_file} down"
     log_info ""
-    log_info "IMPORTANT: If this is your first LangFuse startup:"
+    log_info "First-time LangFuse setup:"
     log_info "  1. Visit http://localhost:3000"
-    log_info "  2. Sign up with email: netai@smartx.kr"
-    log_info "  3. Create a project and generate API keys"
+    log_info "  2. Sign in with the credentials from your .env file"
+    log_info "  3. Create a project and copy the API keys"
     log_info "  4. Add LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY to .env"
-    log_info "  5. Restart: docker compose --profile ${ENGINE} restart monitoring-proxy"
+    log_info "  5. Restart the engine: docker compose -f ${compose_file} restart"
     log_info ""
 }
 
@@ -221,7 +184,7 @@ wait_for_health() {
     local attempt=0
 
     while [ $attempt -lt $max_attempts ]; do
-        if docker compose ps | grep -q "healthy"; then
+        if docker compose ps 2>/dev/null | grep -q "healthy"; then
             log_info "Services are healthy"
             return 0
         fi
@@ -230,23 +193,19 @@ wait_for_health() {
     done
 
     log_warn "Some services may still be starting. Check logs with:"
-    log_warn "  docker compose --profile ${ENGINE} logs -f"
+    log_warn "  docker compose -f docker-compose.${ENGINE}.yml logs -f"
 }
 
 main() {
     log_info "InferencePack Setup Starting..."
     log_info "Script directory: ${SCRIPT_DIR}"
 
-    install_docker
-    install_nvidia_container_toolkit
-    install_python_deps
-
+    check_prerequisites
     download_models
-
     select_engine
-    setup_backend_url
     setup_env_file
-    start_services
+    start_langfuse
+    start_engine
     wait_for_health
 
     log_info "InferencePack setup complete!"

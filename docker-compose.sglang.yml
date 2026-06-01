@@ -9,12 +9,15 @@ services:
     shm_size: 32gb
     ipc: host
     ports:
-      - "8002:30000"
-    volumes:
-      - /models:/models
+      - "8000:30000"
     environment:
       - HF_HOME=/models/.cache/huggingface
       - HF_TOKEN=${HF_TOKEN:-}
+      - OTEL_SERVICE_NAME=sglang-server
+      - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=${OTEL_EXPORTER_OTLP_TRACES_ENDPOINT:-http://langfuse-web:3000/api/public/otel/v1/traces}
+      - OTEL_EXPORTER_OTLP_TRACES_PROTOCOL=${OTEL_EXPORTER_OTLP_TRACES_PROTOCOL:-http/protobuf}
+    volumes:
+      - /models:/models
     command: >
       python3 -m sglang.launch_server
       --model-path /models/EXAONE-3.5-32B-Instruct
@@ -25,6 +28,8 @@ services:
       --mem-fraction-static 0.80
       --chunked-prefill-size 4096
       --trust-remote-code
+      --enable-trace
+      --otlp-traces-endpoint ${OTEL_EXPORTER_OTLP_TRACES_ENDPOINT:-http://langfuse-web:3000/api/public/otel/v1/traces}
     networks:
       - inferencepack
     healthcheck:

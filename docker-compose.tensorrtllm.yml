@@ -1,9 +1,9 @@
 version: "3.8"
 
 services:
-  vllm:
-    image: vllm/vllm-openai:latest
-    container_name: inferencepack-vllm
+  tensorrtllm:
+    image: nvcr.io/nvidia/tensorrt-llm/release:latest
+    container_name: inferencepack-tensorrtllm
     restart: unless-stopped
     runtime: nvidia
     shm_size: 16gb
@@ -14,39 +14,28 @@ services:
       - CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
       - HF_HOME=/models/.cache/huggingface
       - HF_TOKEN=${HF_TOKEN:-}
-      - VLLM_API_KEY=${VLLM_API_KEY:-}
-      - OTEL_SERVICE_NAME=vllm-server
+      - OTEL_SERVICE_NAME=tensorrtllm-server
       - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=${OTEL_EXPORTER_OTLP_TRACES_ENDPOINT:-http://langfuse-web:3000/api/public/otel/v1/traces}
       - OTEL_EXPORTER_OTLP_TRACES_PROTOCOL=${OTEL_EXPORTER_OTLP_TRACES_PROTOCOL:-http/protobuf}
-      - OTEL_EXPORTER_OTLP_TRACES_INSECURE=true
     volumes:
       - /models:/models
-    command:
-      - --model
-      - /models/EXAONE-3.5-32B-Instruct
-      - --trust-remote-code
-      - --tensor-parallel-size
-      - "8"
-      - --gpu-memory-utilization
-      - "0.92"
-      - --max-model-len
-      - "32768"
-      - --dtype
-      - bfloat16
-      - --port
-      - "8000"
-      - --enable-prefix-caching
-      - --enable-chunked-prefill
-      - --otlp-traces-endpoint
-      - "${OTEL_EXPORTER_OTLP_TRACES_ENDPOINT:-http://langfuse-web:3000/api/public/otel/v1/traces}"
+      - /models/.cache/tensorrtllm:/root/.cache/tensorrtllm
+    command: >
+      trtllm-serve
+      /models/EXAONE-3.5-32B-Instruct
+      --tp_size 4
+      --pp_size 1
+      --host 0.0.0.0
+      --port 8000
+      --otlp_traces_endpoint ${OTEL_EXPORTER_OTLP_TRACES_ENDPOINT:-http://langfuse-web:3000/api/public/otel/v1/traces}
     networks:
       - inferencepack
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/v1/models"]
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 120s
+      start_period: 180s
     deploy:
       resources:
         reservations:
