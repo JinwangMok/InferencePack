@@ -218,9 +218,6 @@ services:
       - HF_HOME=/models/.cache/huggingface
       - HF_TOKEN=${HF_TOKEN:-}
       - VLLM_API_KEY=${VLLM_API_KEY:-}
-      - OTEL_SERVICE_NAME=vllm-server
-      - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=${OTEL_EXPORTER_OTLP_TRACES_ENDPOINT:-}
-      - OTEL_EXPORTER_OTLP_TRACES_PROTOCOL=http/protobuf
     volumes:
       - /models:/models
     command:
@@ -266,9 +263,6 @@ services:
     environment:
       - HF_HOME=/models/.cache/huggingface
       - HF_TOKEN=${HF_TOKEN:-}
-      - OTEL_SERVICE_NAME=sglang-server
-      - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=${OTEL_EXPORTER_OTLP_TRACES_ENDPOINT:-}
-      - OTEL_EXPORTER_OTLP_TRACES_PROTOCOL=http/protobuf
     volumes:
       - /models:/models
     command: >
@@ -281,8 +275,6 @@ services:
       --mem-fraction-static 0.80
       --chunked-prefill-size 4096
       --trust-remote-code
-      --enable-trace
-      --otlp-traces-endpoint ${OTEL_EXPORTER_OTLP_TRACES_ENDPOINT:-}
     networks:
       - inferencepack
     healthcheck:
@@ -304,9 +296,6 @@ services:
       - CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
       - HF_HOME=/models/.cache/huggingface
       - HF_TOKEN=${HF_TOKEN:-}
-      - OTEL_SERVICE_NAME=tensorrtllm-server
-      - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=${OTEL_EXPORTER_OTLP_TRACES_ENDPOINT:-}
-      - OTEL_EXPORTER_OTLP_TRACES_PROTOCOL=http/protobuf
     volumes:
       - /models:/models
       - /models/.cache/tensorrtllm:/root/.cache/tensorrtllm
@@ -317,7 +306,6 @@ services:
       --pp_size 1
       --host 0.0.0.0
       --port 8000
-      --otlp_traces_endpoint ${OTEL_EXPORTER_OTLP_TRACES_ENDPOINT:-}
     networks:
       - inferencepack
     healthcheck:

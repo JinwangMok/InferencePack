@@ -22,6 +22,13 @@ install_docker() {
     sudo systemctl enable docker
     sudo systemctl start docker
     log_info "Docker installed successfully"
+
+    if ! groups | grep -q docker; then
+        log_warn "You have been added to the 'docker' group."
+        log_warn "Please run 'newgrp docker' or log out and back in, then re-run this script."
+        log_warn "Alternatively, run: sudo ./run.sh ${ENGINE}"
+        exit 0
+    fi
 }
 
 install_nvidia_container_toolkit() {
