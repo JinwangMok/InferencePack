@@ -49,6 +49,7 @@ The `run.sh` script will:
 |---------|-----|-------------|
 | OpenAI API | `http://localhost:8000/v1` | Inference endpoint (direct engine access) |
 | LangFuse UI | `http://localhost:3000` | LLM observability and tracing dashboard |
+| OpenWebUI | `http://localhost:8080` | Chat UI for interacting with the model |
 
 > **Previous versions used a monitoring-proxy on port 8000. This has been removed.**
 > Engines now expose port 8000 directly and send traces natively to LangFuse via OTLP.
@@ -99,6 +100,26 @@ Models are downloaded to `/models/<model-name>`. Existing valid models are skipp
    LANGFUSE_SECRET_KEY=sk-xxxxxxxx
    ```
 5. **Engine traces are sent automatically** via OTLP — no restart needed.
+
+## OpenWebUI
+
+OpenWebUI is automatically deployed alongside the inference engine. It provides a chat interface for interacting with the model.
+
+1. Visit `http://localhost:8080` after startup
+2. Create an account (sign-up is enabled by default)
+3. Select the model (e.g., `EXAONE-3.5-32B-Instruct`) from the dropdown
+4. Start chatting
+
+OpenWebUI connects directly to the inference engine's OpenAI-compatible API endpoint (`http://localhost:8000/v1`). All requests go through the engine and are traced to LangFuse.
+
+### OpenWebUI Configuration
+
+Environment variables in `.env`:
+- `VLLM_API_KEY`: If set, OpenWebUI will use this key to authenticate with the engine
+- `ENABLE_SIGNUP=true`: Allows new users to register (default)
+- `WEBUI_AUTH=false`: Disables authentication requirement (default)
+
+To change these, edit the compose file for your engine or set them in `.env`.
 
 ## Engine Configuration
 
@@ -152,9 +173,9 @@ vllm bench throughput \
 ```
 InferencePack/
 ├── docker-compose.langfuse.yml     # LangFuse v3 stack (run once)
-├── docker-compose.vllm.yml         # vLLM inference engine
-├── docker-compose.sglang.yml       # SGLang inference engine
-├── docker-compose.tensorrtllm.yml  # TensorRT-LLM inference engine
+├── docker-compose.vllm.yml         # vLLM + OpenWebUI
+├── docker-compose.sglang.yml       # SGLang + OpenWebUI
+├── docker-compose.tensorrtllm.yml  # TensorRT-LLM + OpenWebUI
 ├── selected-models.yaml            # Model registry
 ├── run.sh                          # Single entrypoint script
 ├── .env.example                    # Environment variable template

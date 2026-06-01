@@ -178,6 +178,7 @@ start_engine() {
     log_info "  InferencePack is starting up"
     log_info "=========================================="
     log_info "LangFuse UI:     http://localhost:3000"
+    log_info "OpenWebUI:       http://localhost:8080"
     log_info "API Endpoint:    http://localhost:8000/v1"
     log_info "Engine:          ${ENGINE}"
     log_info ""

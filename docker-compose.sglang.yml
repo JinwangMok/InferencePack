@@ -43,6 +43,30 @@ services:
       retries: 5
       start_period: 120s
 
+  openwebui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: inferencepack-openwebui
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - OPENAI_API_BASE_URL=http://sglang:30000/v1
+      - OPENAI_API_KEY=${VLLM_API_KEY:-}
+      - DEFAULT_MODELS=/models/EXAONE-3.5-32B-Instruct
+      - ENABLE_SIGNUP=true
+      - WEBUI_AUTH=false
+      - HF_HOME=/models/.cache/huggingface
+    volumes:
+      - openwebui_data:/app/backend/data
+    networks:
+      - inferencepack
+    depends_on:
+      sglang:
+        condition: service_started
+
+volumes:
+  openwebui_data:
+
 networks:
   inferencepack:
     external: true
