@@ -164,17 +164,17 @@ EOF
         log_info "Please review and update HF_TOKEN and LangFuse API keys if needed"
     fi
 
-    pk=$(grep "^LANGFUSE_PUBLIC_KEY=" "${env_file}" 2>/dev/null | cut -d= -f2 | tr -d '"' | tr -d " '")
     local pk sk
     pk=$(grep "^LANGFUSE_PUBLIC_KEY=" "${env_file}" 2>/dev/null | cut -d= -f2 | tr -d '"' | tr -d " '")
     sk=$(grep "^LANGFUSE_SECRET_KEY=" "${env_file}" 2>/dev/null | cut -d= -f2 | tr -d '"' | tr -d " '")
     if [ -n "${pk}" ] && [ -n "${sk}" ]; then
         local auth_b64
         auth_b64=$(echo -n "${pk}:${sk}" | base64 -w0)
-        if grep -q "^OTEL_EXPORTER_OTLP_HEADERS=" "${env_file}"; then
-            sed -i "s|^OTEL_EXPORTER_OTLP_HEADERS=.*|OTEL_EXPORTER_OTLP_HEADERS=Authorization=Basic ${auth_b64}|" "${env_file}"
+        local header_value="Authorization=Basic ${auth_b64},x-langfuse-ingestion-version=4"
+        if grep -q "^OTEL_EXPORTER_OTLP_TRACES_HEADERS=" "${env_file}"; then
+            sed -i "s|^OTEL_EXPORTER_OTLP_TRACES_HEADERS=.*|OTEL_EXPORTER_OTLP_TRACES_HEADERS=${header_value}|" "${env_file}"
         else
-            echo "OTEL_EXPORTER_OTLP_HEADERS=Authorization=Basic ${auth_b64}" >> "${env_file}"
+            echo "OTEL_EXPORTER_OTLP_TRACES_HEADERS=${header_value}" >> "${env_file}"
         fi
         log_info "Updated OTEL auth header for LangFuse tracing"
     fi
