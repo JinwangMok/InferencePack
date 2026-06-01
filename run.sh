@@ -36,14 +36,24 @@ check_prerequisites() {
     fi
 
     if ! command -v uv >/dev/null 2>&1; then
-        log_warn "uv not found. Installing uv..."
-        curl -LsSf https://astral.sh/uv/install.sh | sh || {
-            log_error "Failed to install uv. Please install it manually:"
-            log_error "  curl -LsSf https://astral.sh/uv/install.sh | sh"
-            exit 1
-        }
-        export PATH="$HOME/.local/bin:$PATH"
-        log_info "uv installed successfully"
+        local uv_bin="$HOME/.local/bin/uv"
+        if [ -x "$uv_bin" ]; then
+            export PATH="$HOME/.local/bin:$PATH"
+            log_info "uv found at $uv_bin (added to PATH)"
+        else
+            log_warn "uv not found. Installing uv..."
+            curl -LsSf https://astral.sh/uv/install.sh | sh || {
+                log_error "Failed to install uv. Please install it manually:"
+                log_error "  curl -LsSf https://astral.sh/uv/install.sh | sh"
+                exit 1
+            }
+            export PATH="$HOME/.local/bin:$PATH"
+            if ! grep -q 'export PATH=.*\.local/bin' "$HOME/.bashrc" 2>/dev/null; then
+                echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$HOME/.bashrc"
+                log_info "Added ~/.local/bin to PATH in ~/.bashrc"
+            fi
+            log_info "uv installed successfully"
+        fi
     fi
 }
 
