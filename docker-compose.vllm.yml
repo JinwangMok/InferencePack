@@ -1,11 +1,8 @@
-version: "3.8"
-
 services:
   vllm:
     image: vllm/vllm-openai:latest
     container_name: inferencepack-vllm
     restart: unless-stopped
-    runtime: nvidia
     shm_size: 16gb
     ipc: host
     ports:

@@ -1,11 +1,8 @@
-version: "3.8"
-
 services:
   tensorrtllm:
     image: nvcr.io/nvidia/tensorrt-llm/release:latest
     container_name: inferencepack-tensorrtllm
     restart: unless-stopped
-    runtime: nvidia
     shm_size: 16gb
     ipc: host
     ports:

@@ -1,12 +1,16 @@
-version: "3.8"
-
 services:
   sglang:
     image: lmsysorg/sglang:latest-runtime
     container_name: inferencepack-sglang
     restart: unless-stopped
-    gpus: all
     shm_size: 32gb
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
     ipc: host
     ports:
       - "8000:30000"
