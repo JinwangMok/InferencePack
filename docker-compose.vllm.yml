@@ -22,7 +22,7 @@ services:
       - /models/EXAONE-3.5-32B-Instruct
       - --trust-remote-code
       - --tensor-parallel-size
-      - "7"
+      - "5"
       - --distributed-executor-backend
       - mp
       - --gpu-memory-utilization
