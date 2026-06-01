@@ -8,7 +8,6 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
       - HF_HOME=/models/.cache/huggingface
       - HF_TOKEN=${HF_TOKEN:-}
       - VLLM_API_KEY=${VLLM_API_KEY:-}
@@ -23,7 +22,7 @@ services:
       - /models/EXAONE-3.5-32B-Instruct
       - --trust-remote-code
       - --tensor-parallel-size
-      - "8"
+      - "-1"
       - --gpu-memory-utilization
       - "0.92"
       - --max-model-len
@@ -61,7 +60,7 @@ services:
     environment:
       - OPENAI_API_BASE_URL=http://vllm:8000/v1
       - OPENAI_API_KEY=${VLLM_API_KEY:-}
-      - DEFAULT_MODELS=/models/EXAONE-3.5-32B-Instruct
+      - DEFAULT_MODELS=EXAONE-3.5-32B-Instruct
       - ENABLE_SIGNUP=true
       - WEBUI_AUTH=false
       - HF_HOME=/models/.cache/huggingface
