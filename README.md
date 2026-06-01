@@ -21,6 +21,8 @@ A unified, Docker-based inference stack for DGX A100 servers supporting **vLLM**
 - HuggingFace token (for gated models)
 
 > **Note**: `run.sh` no longer auto-installs Docker or NVIDIA Toolkit. Please ensure these are pre-installed on your bare-metal server.
+>
+> `run.sh` uses **[uv](https://docs.astral.sh/uv/)** (Astral's Python package manager) to install `huggingface-hub[cli]`. If `uv` is not found, it will be automatically installed to `~/.local/bin`.
 
 ## Quick Start
 
@@ -193,6 +195,12 @@ Reduce `--gpu-memory-utilization` or `--max-model-len` in the compose file for y
 Ensure `HF_TOKEN` is set in `.env` for gated models:
 ```bash
 export HF_TOKEN=your_token_here
+```
+
+If `uv` is not found:
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+export PATH="$HOME/.local/bin:$PATH"
 ```
 
 ## License
