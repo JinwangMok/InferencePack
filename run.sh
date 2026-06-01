@@ -34,6 +34,15 @@ check_prerequisites() {
         log_error "python3 is required but not installed."
         exit 1
     fi
+
+    if ! command -v pip3 >/dev/null 2>&1; then
+        log_warn "pip3 not found. Attempting to install python3-pip..."
+        sudo apt-get update && sudo apt-get install -y python3-pip || {
+            log_error "Failed to install python3-pip. Please install it manually:"
+            log_error "  sudo apt-get update && sudo apt-get install -y python3-pip"
+            exit 1
+        }
+    fi
 }
 
 download_models() {
