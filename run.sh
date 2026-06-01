@@ -62,8 +62,14 @@ download_models() {
     sudo mkdir -p "${MODELS_DIR}"
     sudo chmod 777 "${MODELS_DIR}" || true
 
+    if [ -d "$HOME/.cache/huggingface" ]; then
+        sudo chown -R "$(id -u):$(id -g)" "$HOME/.cache/huggingface" 2>/dev/null || true
+    fi
+
+    export HF_HOME="${HF_HOME:-$HOME/.cache/huggingface}"
     python3 "${SCRIPT_DIR}/scripts/download_models.py" \
         --config "${CONFIG_FILE}" \
+        --model "EXAONE-3.5-32B-Instruct" \
         ${HF_TOKEN:+--token "${HF_TOKEN}"} \
         || {
             log_error "Model download/check failed"
@@ -212,8 +218,8 @@ main() {
     log_info "Script directory: ${SCRIPT_DIR}"
 
     check_prerequisites
-    download_models
     select_engine
+    download_models
     setup_env_file
     start_langfuse
     start_engine
