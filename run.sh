@@ -35,13 +35,15 @@ check_prerequisites() {
         exit 1
     fi
 
-    if ! command -v pip3 >/dev/null 2>&1; then
-        log_warn "pip3 not found. Attempting to install python3-pip..."
-        sudo apt-get update && sudo apt-get install -y python3-pip || {
-            log_error "Failed to install python3-pip. Please install it manually:"
-            log_error "  sudo apt-get update && sudo apt-get install -y python3-pip"
+    if ! command -v uv >/dev/null 2>&1; then
+        log_warn "uv not found. Installing uv..."
+        curl -LsSf https://astral.sh/uv/install.sh | sh || {
+            log_error "Failed to install uv. Please install it manually:"
+            log_error "  curl -LsSf https://astral.sh/uv/install.sh | sh"
             exit 1
         }
+        export PATH="$HOME/.local/bin:$PATH"
+        log_info "uv installed successfully"
     fi
 }
 
@@ -53,8 +55,8 @@ download_models() {
     fi
 
     if ! command -v huggingface-cli >/dev/null 2>&1; then
-        log_info "Installing huggingface-hub..."
-        pip3 install --user -q huggingface-hub
+        log_info "Installing huggingface-hub via uv..."
+        uv tool install huggingface-hub[cli]
     fi
 
     sudo mkdir -p "${MODELS_DIR}"

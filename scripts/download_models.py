@@ -11,8 +11,8 @@ from typing import List, Dict, Any, Optional
 def ensure_huggingface_cli():
     if subprocess.run(["huggingface-cli", "--version"], capture_output=True).returncode == 0:
         return
-    print("[INFO] Installing huggingface-hub...")
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "--user", "-q", "huggingface-hub[cli]"])
+    print("[INFO] Installing huggingface-hub via uv...")
+    subprocess.check_call(["uv", "tool", "install", "huggingface-hub[cli]"])
 
 
 def validate_model_directory(model_path: Path) -> bool:
