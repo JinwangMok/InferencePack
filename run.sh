@@ -169,7 +169,7 @@ EOF
     sk=$(grep "^LANGFUSE_SECRET_KEY=" "${env_file}" 2>/dev/null | cut -d= -f2 | tr -d '"' | tr -d " '")
     if [ -n "${pk}" ] && [ -n "${sk}" ]; then
         local auth_b64
-        auth_b64=$(echo -n "${pk}:${sk}" | base64 -w0)
+        auth_b64=$(printf '%s' "${pk}:${sk}" | base64 -w0)
         local header_value="Authorization=Basic ${auth_b64},x-langfuse-ingestion-version=4"
         if grep -q "^OTEL_EXPORTER_OTLP_TRACES_HEADERS=" "${env_file}"; then
             sed -i "s|^OTEL_EXPORTER_OTLP_TRACES_HEADERS=.*|OTEL_EXPORTER_OTLP_TRACES_HEADERS=${header_value}|" "${env_file}"
