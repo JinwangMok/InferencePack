@@ -1,0 +1,22 @@
+name: Security configuration
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Shell syntax
+        run: bash -n run.sh scripts/diagnose_langfuse.sh
+      - name: Regression and Compose rendering (no containers)
+        run: |
+          docker compose version
+          printf '#!/bin/sh\nexec docker compose "$@"\n' > "$RUNNER_TEMP/compose-test"
+          chmod 700 "$RUNNER_TEMP/compose-test"
+          COMPOSE_BIN="$RUNNER_TEMP/compose-test" python3 -m unittest discover -s tests -v
