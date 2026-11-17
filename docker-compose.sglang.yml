@@ -13,7 +13,7 @@ services:
               capabilities: [gpu]
     ipc: host
     ports:
-      - "8000:30000"
+      - "127.0.0.1:8000:30000"
     environment:
       - HF_HOME=/models/.cache/huggingface
       - HF_TOKEN=${HF_TOKEN:-}
@@ -27,6 +27,7 @@ services:
       --model-path /models/EXAONE-3.5-32B-Instruct
       --host 0.0.0.0
       --port 30000
+      --api-key ${VLLM_API_KEY:?Set VLLM_API_KEY; see SECURITY.md}
       --tp 8
       --dp 1
       --mem-fraction-static 0.80
@@ -48,13 +49,13 @@ services:
     container_name: inferencepack-openwebui
     restart: unless-stopped
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     environment:
       - OPENAI_API_BASE_URL=http://sglang:30000/v1
-      - OPENAI_API_KEY=${VLLM_API_KEY:-}
+      - OPENAI_API_KEY=${VLLM_API_KEY:?Set VLLM_API_KEY; see SECURITY.md}
       - DEFAULT_MODELS=/models/EXAONE-3.5-32B-Instruct
-      - ENABLE_SIGNUP=true
-      - WEBUI_AUTH=false
+      - ENABLE_SIGNUP=${ENABLE_SIGNUP:-false}
+      - WEBUI_AUTH=true
       - HF_HOME=/models/.cache/huggingface
     volumes:
       - openwebui_data:/app/backend/data
