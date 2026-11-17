@@ -54,7 +54,16 @@ def load_selected_models(config_path: str) -> List[Dict[str, Any]]:
 
 
 def get_hf_token() -> Optional[str]:
-    return os.environ.get("HF_TOKEN") or os.environ.get("HUGGINGFACE_TOKEN")
+    # Keep the token out of process arguments; use the same private config as startup.
+    for key in ("HF_TOKEN", "HUGGINGFACE_TOKEN"):
+        if key in os.environ:
+            return os.environ[key] or None
+    from configure_env import ROOT, read_env
+    path = ROOT / ".env"
+    if path.exists():
+        _, values = read_env(path)
+        return values.get("HF_TOKEN") or None
+    return None
 
 
 def main():
