@@ -6,7 +6,7 @@ services:
     shm_size: 16gb
     ipc: host
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     environment:
       - CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
       - HF_HOME=/models/.cache/huggingface
@@ -46,13 +46,13 @@ services:
     container_name: inferencepack-openwebui
     restart: unless-stopped
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     environment:
       - OPENAI_API_BASE_URL=http://tensorrtllm:8000/v1
-      - OPENAI_API_KEY=${VLLM_API_KEY:-}
+      - OPENAI_API_KEY=${VLLM_API_KEY:?Set VLLM_API_KEY; see SECURITY.md}
       - DEFAULT_MODELS=/models/EXAONE-3.5-32B-Instruct
-      - ENABLE_SIGNUP=true
-      - WEBUI_AUTH=false
+      - ENABLE_SIGNUP=${ENABLE_SIGNUP:-false}
+      - WEBUI_AUTH=true
       - HF_HOME=/models/.cache/huggingface
     volumes:
       - openwebui_data:/app/backend/data
