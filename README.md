@@ -7,14 +7,14 @@ A unified, Docker-based inference stack for DGX A100 servers supporting **vLLM**
 - **Multi-Engine Support**: Choose between vLLM, SGLang, or TensorRT-LLM via a single command
 - **Automated Model Management**: Downloads and caches HuggingFace models with resume support
 - **Native LangFuse Tracing**: Inference engines send OpenTelemetry traces directly to LangFuse — no proxy bottleneck
-- **Production-Ready**: Optimized defaults for A100 8x GPU configurations
+- **Local-only secure defaults**: Loopback port bindings, authenticated WebUI and explicit service secrets; see [SECURITY.md](SECURITY.md) before deployment
 - **One-Command Deploy**: `./run.sh [vllm|sglang|tensorrtllm]` handles model checks and service startup
 
 ## Requirements
 
 - Ubuntu 24.04 LTS
 - NVIDIA DGX A100 (8x A100 80GB)
-- **Docker** installed and running
+- **Docker Engine 28+** with Compose installed and running
 - **NVIDIA Container Toolkit** configured (`docker info | grep nvidia`)
 - NVIDIA drivers installed
 - Internet access for Docker image pulls and model downloads
@@ -30,15 +30,20 @@ A unified, Docker-based inference stack for DGX A100 servers supporting **vLLM**
 git clone https://github.com/JinwangMok/InferencePack.git
 cd InferencePack
 
-# Run with vLLM (recommended for EXAONE 3.5 32B)
+# NEW installations only: create a private configuration
+python3 scripts/configure_env.py --init
+
+# Follow SECURITY.md for local first-user setup, then run vLLM
 ./run.sh vllm
 
 # Or run interactively to select engine
 ./run.sh
 ```
 
+Existing installations must follow the [migration guide](SECURITY.md#existing-deployments-deliberate-migration) before using these defaults. Preserve data and existing encryption keys.
+
 The `run.sh` script will:
-1. Verify Docker and prerequisites
+1. Validate private configuration first, then verify Docker and prerequisites
 2. Verify and download models specified in `selected-models.yaml`
 3. Start LangFuse services
 4. Start the chosen inference engine (with native OTEL tracing to LangFuse)
@@ -87,39 +92,26 @@ models:
 
 Models are downloaded to `/models/<model-name>`. Existing valid models are skipped automatically.
 
-## LangFuse Setup
+## Authentication, first users and secrets
 
-1. Visit `http://localhost:3000` after startup
-2. Sign in with the pre-configured account from your `.env` file:
-   - Email: `netai@smartx.kr`
-   - Password: `netai123`
-3. Create a project and generate API keys
-4. Add keys to `.env` if you want to use LangFuse client SDKs elsewhere:
-   ```bash
-   LANGFUSE_PUBLIC_KEY=pk-xxxxxxxx
-   LANGFUSE_SECRET_KEY=sk-xxxxxxxx
-   ```
-5. **Engine traces are sent automatically** via OTLP — no restart needed.
+Read [SECURITY.md](SECURITY.md) for new installation and existing-data migration.
+The local UIs are at `http://localhost:3000` (Langfuse) and
+`http://localhost:8080` (OpenWebUI). All published ports bind to `127.0.0.1`.
 
-## OpenWebUI
+OpenWebUI authentication is enabled. Registrations are closed by default in both
+UIs. Temporarily enable signup only for supervised local first-user setup, then
+close it and verify the effective UI settings. No shared default account is
+provided. Existing users and persisted configuration need migration review.
 
-OpenWebUI is automatically deployed alongside the inference engine. It provides a chat interface for interacting with the model.
+`VLLM_API_KEY` authenticates vLLM and SGLang clients, including OpenWebUI.
+TensorRT-LLM's API stays local-only and needs an authenticated proxy for any
+remote sharing; the WebUI's API key does not secure that backend.
 
-1. Visit `http://localhost:8080` after startup
-2. Create an account (sign-up is enabled by default)
-3. Select the model (e.g., `EXAONE-3.5-32B-Instruct`) from the dropdown
-4. Start chatting
-
-OpenWebUI connects directly to the inference engine's OpenAI-compatible API endpoint (`http://localhost:8000/v1`). All requests go through the engine and are traced to LangFuse.
-
-### OpenWebUI Configuration
-
-Environment variables in `.env`:
-- `VLLM_API_KEY`: If set, OpenWebUI will use this key to authenticate with the engine
-- `ENABLE_SIGNUP=true`: Allows new users to register (default)
-- `WEBUI_AUTH=false`: Disables authentication requirement (default)
-
-To change these, edit the compose file for your engine or set them in `.env`.
+Required secrets are generated independently by `scripts/configure_env.py --init`
+for new installations. Keep `.env` private and backed up. To enable tracing, add
+both Langfuse project keys to `.env` and re-run `./run.sh <engine>`. Startup derives
+the trace authorization header without printing it. Recreate changed containers
+rather than using `docker compose restart` for configuration updates.
 
 ## Engine Configuration
 
@@ -136,6 +128,9 @@ Modify these files directly to tune for your workload.
 ## Benchmarking
 
 ### vLLM Throughput Benchmark
+
+The command below loads a local model. For HTTP serving benchmarks, configure
+the client with the private API key without committing it or sharing shell logs.
 
 ```bash
 vllm bench throughput \
@@ -178,7 +173,8 @@ InferencePack/
 ├── docker-compose.tensorrtllm.yml  # TensorRT-LLM + OpenWebUI
 ├── selected-models.yaml            # Model registry
 ├── run.sh                          # Single entrypoint script
-├── .env.example                    # Environment variable template
+├── .env.example                    # Empty secret template (documentation)
+├── SECURITY.md                     # Bootstrap, migration and security boundaries
 ├── scripts/
 │   └── download_models.py          # Model download/verification
 └── README.md                       # This file
