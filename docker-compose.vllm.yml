@@ -6,11 +6,11 @@ services:
     shm_size: 16gb
     ipc: host
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     environment:
       - HF_HOME=/models/.cache/huggingface
       - HF_TOKEN=${HF_TOKEN:-}
-      - VLLM_API_KEY=${VLLM_API_KEY:-}
+      - VLLM_API_KEY=${VLLM_API_KEY:?Set VLLM_API_KEY; see SECURITY.md}
       - OTEL_SERVICE_NAME=vllm-server
       - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=${OTEL_EXPORTER_OTLP_TRACES_ENDPOINT:-http://langfuse-web:3000/api/public/otel/v1/traces}
       - OTEL_EXPORTER_OTLP_TRACES_PROTOCOL=${OTEL_EXPORTER_OTLP_TRACES_PROTOCOL:-http/protobuf}
@@ -57,13 +57,13 @@ services:
     container_name: inferencepack-openwebui
     restart: unless-stopped
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     environment:
       - OPENAI_API_BASE_URL=http://vllm:8000/v1
-      - OPENAI_API_KEY=${VLLM_API_KEY:-}
+      - OPENAI_API_KEY=${VLLM_API_KEY:?Set VLLM_API_KEY; see SECURITY.md}
       - DEFAULT_MODELS=EXAONE-3.5-32B-Instruct
-      - ENABLE_SIGNUP=true
-      - WEBUI_AUTH=false
+      - ENABLE_SIGNUP=${ENABLE_SIGNUP:-false}
+      - WEBUI_AUTH=true
       - ENABLE_OLLAMA_API=false
       - HF_HOME=/models/.cache/huggingface
     volumes:
